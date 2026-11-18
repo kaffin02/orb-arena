@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ORB ARENA — Eat. Grow. Rule the arena.</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1026;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #e2e8f0; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .hidden { display: none !important; }
+
+  /* HUD: top-left cluster. */
+  #hud { position: fixed; top: 14px; left: 14px; z-index: 5; display: flex; gap: 10px; }
+  .hud-chip { background: rgba(10, 15, 30, 0.78); border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 10px; padding: 7px 12px; min-width: 74px; }
+  .hud-chip .label { font-size: 10px; letter-spacing: 0.14em; color: #94a3b8; }
+  .hud-chip .value { font-size: 22px; font-weight: 800; line-height: 1.1; color: #fff; }
+
+  /* Leaderboard: top-right. */
+  #leaderboard { position: fixed; top: 14px; right: 14px; z-index: 5; width: 218px;
+    background: rgba(10, 15, 30, 0.78); border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+  .board-title { font-size: 11px; letter-spacing: 0.16em; color: #94a3b8; margin-bottom: 6px; }
+  .board-row { display: flex; align-items: center; gap: 7px; padding: 2.5px 0; }
+  .board-row.me { background: rgba(74, 222, 128, 0.16); border-radius: 6px; padding-left: 4px; padding-right: 4px; }
+  .board-rank { width: 16px; color: #94a3b8; text-align: right; }
+  .board-dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .board-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .board-mass { font-weight: 700; }
+
+  /* Kill feed: top-centre. */
+  #feed { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 5;
+    text-align: center; font-size: 13px; color: #cbd5e1; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+  #feed div { margin-bottom: 2px; }
+
+  /* Champion banner. */
+  #banner { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 6;
+    background: linear-gradient(90deg, #b45309, #f59e0b, #b45309); color: #fff;
+    font-weight: 800; font-size: 17px; padding: 9px 20px; border-radius: 999px;
+    box-shadow: 0 4px 24px rgba(245, 158, 11, 0.55); }
+
+  /* Minimap: bottom-right. */
+  #minimap { position: fixed; right: 14px; bottom: 14px; z-index: 5; width: 150px; height: 150px;
+    border: 1px solid rgba(148, 163, 184, 0.4); border-radius: 8px; }
+  .map-label { position: fixed; right: 16px; bottom: 168px; z-index: 5; font-size: 10px;
+    letter-spacing: 0.14em; color: #94a3b8; }
+
+  /* Controls hint: bottom-left. */
+  #hint { position: fixed; left: 14px; bottom: 14px; z-index: 5; font-size: 12px; color: #94a3b8;
+    background: rgba(10, 15, 30, 0.6); border-radius: 8px; padding: 8px 11px; line-height: 1.6; }
+  #hint b { color: #e2e8f0; }
+
+  /* Corner buttons: under the HUD, left side, clear of the leaderboard. */
+  .corner-btn { position: fixed; z-index: 6; background: rgba(10, 15, 30, 0.78);
+    border: 1px solid rgba(148, 163, 184, 0.35); color: #e2e8f0; border-radius: 8px;
+    padding: 7px 11px; font-size: 13px; cursor: pointer; }
+  .corner-btn:hover { background: rgba(30, 41, 59, 0.9); }
+  #pause-btn { top: 96px; left: 14px; }
+  #mute-btn { top: 136px; left: 14px; }
+
+  /* Full-screen overlays: menu, pause, game over. */
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center;
+    justify-content: center; background: rgba(5, 8, 20, 0.72); backdrop-filter: blur(2px); }
+  .panel { background: #0f172a; border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 16px;
+    padding: 30px 36px; width: 460px; max-width: calc(100vw - 48px); text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); }
+  .title { font-size: 54px; font-weight: 900; letter-spacing: 0.04em; line-height: 1;
+    background: linear-gradient(90deg, #4ade80, #22d3ee, #a78bfa);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .subtitle { font-size: 15px; color: #94a3b8; margin-top: 8px; }
+  .howto { text-align: left; margin: 20px auto 4px; font-size: 14px; line-height: 1.75; color: #cbd5e1; }
+  .howto b { color: #fff; }
+  #player-name { width: 220px; padding: 10px 12px; font-size: 16px; text-align: center;
+    border-radius: 10px; border: 1px solid rgba(148, 163, 184, 0.4); background: #1e293b;
+    color: #fff; margin-top: 18px; }
+  .big-btn { display: inline-block; margin-top: 18px; padding: 13px 34px; font-size: 18px;
+    font-weight: 800; color: #052e16; background: linear-gradient(90deg, #4ade80, #22d3ee);
+    border: none; border-radius: 999px; cursor: pointer; }
+  .big-btn:hover { filter: brightness(1.1); }
+  .ghost-btn { display: inline-block; margin-top: 12px; padding: 9px 22px; font-size: 14px;
+    background: transparent; color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.4);
+    border-radius: 999px; cursor: pointer; }
+  .best-line { margin-top: 14px; font-size: 13px; color: #94a3b8; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0 4px; }
+  .stat-cell { background: #1e293b; border-radius: 10px; padding: 12px; }
+  .stat-cell .label { font-size: 11px; letter-spacing: 0.12em; color: #94a3b8; }
+  .stat-cell .value { font-size: 26px; font-weight: 800; color: #fff; }
+  .over-title { font-size: 46px; font-weight: 900; color: #f43f5e; line-height: 1; }
+  .pause-title { font-size: 40px; font-weight: 900; color: #fff; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="ORB ARENA: steer your blob with the mouse, eat pellets and smaller blobs, avoid bigger ones"></canvas>
+
+<div id="hud">
+  <div class="hud-chip"><div class="label">MASS</div><div class="value" id="hud-mass">25</div></div>
+  <div class="hud-chip"><div class="label">SCORE</div><div class="value" id="hud-score">0</div></div>
+  <div class="hud-chip"><div class="label">RANK</div><div class="value" id="hud-rank">—</div></div>
+  <div class="hud-chip"><div class="label">TIME</div><div class="value" id="hud-time">0:00</div></div>
+</div>
+
+<div id="leaderboard"></div>
+<div id="feed"></div>
+<div id="banner" class="hidden"></div>
+<div class="map-label">MAP</div>
+<canvas id="minimap" width="150" height="150"></canvas>
+<div id="hint"><b>Mouse</b> steer &nbsp;·&nbsp; <b>Space</b> split &nbsp;·&nbsp; <b>W</b> eject mass<br>
+<b>P</b> pause &nbsp;·&nbsp; <b>M</b> sound &nbsp;·&nbsp; WASD also steers</div>
+<button id="pause-btn" class="corner-btn">⏸ Pause</button>
+<button id="mute-btn" class="corner-btn">🔊 Sound on</button>
+
+<div id="menu" class="overlay">
+  <div class="panel">
+    <div class="title">ORB ARENA</div>
+    <div class="subtitle">Eat. Grow. Rule the arena.</div>
+    <div class="howto">
+      🟢 <b>Steer with the mouse</b> (or WASD) and eat the glowing pellets to grow.<br>
+      🟡 <b>Eat blobs smaller than you.</b> Bigger blobs eat you — run!<br>
+      ✂️ <b>Space splits</b> you in two to catch prey. <b>W ejects</b> mass.<br>
+      🌵 <b>Thorn orbs split big blobs apart.</b> Small blobs slip past them.<br>
+      ⭐ <b>Golden mega orbs are worth +40.</b> Top the leaderboard to wear the crown.
+    </div>
+    <input id="player-name" maxlength="12" placeholder="Your name" value="You" aria-label="Your name">
+    <br>
+    <button id="start-btn" class="big-btn">▶ &nbsp;PLAY</button>
+    <div class="best-line">Best mass: <span id="best-mass">0</span></div>
+  </div>
+</div>
+
+<div id="pause" class="overlay hidden">
+  <div class="panel">
+    <div class="pause-title">PAUSED</div>
+    <div class="subtitle">Take a breath. The arena waits.</div>
+    <button id="resume-btn" class="big-btn">▶ &nbsp;RESUME</button><br>
+    <button id="restart-btn" class="ghost-btn">↻ Restart</button>
+  </div>
+</div>
+
+<div id="over" class="overlay hidden">
+  <div class="panel">
+    <div class="over-title">EATEN!</div>
+    <div class="subtitle">A bigger blob got you. The arena remembers the bold.</div>
+    <div class="stat-grid">
+      <div class="stat-cell"><div class="label">PEAK MASS</div><div class="value" id="over-mass">0</div></div>
+      <div class="stat-cell"><div class="label">SURVIVED</div><div class="value" id="over-time">0:00</div></div>
+      <div class="stat-cell"><div class="label">BLOBS EATEN</div><div class="value" id="over-kills">0</div></div>
+      <div class="stat-cell"><div class="label">SCORE</div><div class="value" id="over-score">0</div></div>
+    </div>
+    <button id="restart-btn-2" class="big-btn">↻ &nbsp;PLAY AGAIN</button>
+    <div class="best-line">Best mass: <span id="over-best">0</span> &nbsp;·&nbsp; press R to restart</div>
+  </div>
+</div>
+
+<p id="status" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;"></p>
+
+<script src="./src/config.js"></script>
+<script src="./src/random.js"></script>
+<script src="./src/audio.js"></script>
+<script src="./src/input.js"></script>
+<script src="./src/blobs.js"></script>
+<script src="./src/bots.js"></script>
+<script src="./src/world.js"></script>
+<script src="./src/render.js"></script>
+<script src="./src/shots.js"></script>
+<script src="./src/main.js"></script>
+</body>
+</html>
